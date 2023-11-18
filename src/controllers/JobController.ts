@@ -240,7 +240,7 @@ export class JobController implements AppRoute {
       });
     }
 
-    return res.status(200).json(gigs);
+    return res.status(200).json(decodedJobs);
   }
 
   private async getJobById(req: Request, res: Response) {

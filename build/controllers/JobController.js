@@ -210,7 +210,7 @@ class JobController {
                     description: dec[4],
                 });
             }
-            return res.status(200).json(gigs);
+            return res.status(200).json(decodedJobs);
         });
     }
     getJobById(req, res) {
