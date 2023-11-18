@@ -37,6 +37,10 @@ export class JobController implements AppRoute {
     this.router.get("/all-jobs", cors(), (req, res) => {
       this.getAllJobs(req, res);
     });
+
+    this.router.get("/id/:id", cors(), (req, res) => {
+      this.getJobById(req, res)
+    })
   }
   private async estimateGas(functionName: string, data: any) {
     const provider = new ethers.AlchemyProvider(
@@ -194,7 +198,7 @@ export class JobController implements AppRoute {
     const query = `
   query {
     attestations(where: { schemaId: { equals: "0xf602cc558d4aa60987b4b51d3416f55cc59cb66f6571682681116775c04b4251" } }) {
-      id
+      id 
       attester
       recipient
       refUID
@@ -236,6 +240,48 @@ export class JobController implements AppRoute {
       });
     }
 
-    return res.status(200).json(decodedJobs);
+    return res.status(200).json(gigs);
+  }
+
+  private async getJobById(req: Request, res: Response) {
+    const query = `query Attestation {
+      attestation(
+        where: { id: "${req.params.id}" }
+      ) {
+        id
+        attester
+        recipient
+        refUID
+        revocable
+        revocationTime
+        expirationTime
+        data
+      }
+    }`
+
+    const endpoint = "https://sepolia.easscan.org/graphql";
+
+    const job = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    const jobJson = await job.json();
+
+    const firstArray = ["string", "string", "uint256", "uint256", "string"];
+    const dec = AbiCoder.defaultAbiCoder().decode(firstArray, jobJson.data.attestation.data);
+
+    return res.status(200).json({
+      id: jobJson.data.attestation.id,
+      beneficiary: jobJson.data.attestation.attester,
+      title: dec[0],
+      category: dec[1],
+      deadline: dec[2].toString(),
+      price: formatEther(dec[3]),
+      description: dec[4],
+    });
   }
 }

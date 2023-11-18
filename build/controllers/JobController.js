@@ -37,6 +37,9 @@ class JobController {
         this.router.get("/all-jobs", (0, cors_1.default)(), (req, res) => {
             this.getAllJobs(req, res);
         });
+        this.router.get("/id/:id", (0, cors_1.default)(), (req, res) => {
+            this.getJobById(req, res);
+        });
     }
     estimateGas(functionName, data) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -170,7 +173,7 @@ class JobController {
             const query = `
   query {
     attestations(where: { schemaId: { equals: "0xf602cc558d4aa60987b4b51d3416f55cc59cb66f6571682681116775c04b4251" } }) {
-      id
+      id 
       attester
       recipient
       refUID
@@ -207,7 +210,45 @@ class JobController {
                     description: dec[4],
                 });
             }
-            return res.status(200).json(decodedJobs);
+            return res.status(200).json(gigs);
+        });
+    }
+    getJobById(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const query = `query Attestation {
+      attestation(
+        where: { id: "${req.params.id}" }
+      ) {
+        id
+        attester
+        recipient
+        refUID
+        revocable
+        revocationTime
+        expirationTime
+        data
+      }
+    }`;
+            const endpoint = "https://sepolia.easscan.org/graphql";
+            const job = yield fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ query }),
+            });
+            const jobJson = yield job.json();
+            const firstArray = ["string", "string", "uint256", "uint256", "string"];
+            const dec = ethers_1.AbiCoder.defaultAbiCoder().decode(firstArray, jobJson.data.attestation.data);
+            return res.status(200).json({
+                id: jobJson.data.attestation.id,
+                beneficiary: jobJson.data.attestation.attester,
+                title: dec[0],
+                category: dec[1],
+                deadline: dec[2].toString(),
+                price: (0, ethers_1.formatEther)(dec[3]),
+                description: dec[4],
+            });
         });
     }
 }
