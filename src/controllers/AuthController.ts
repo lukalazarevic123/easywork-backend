@@ -22,6 +22,7 @@ export class AuthController implements AppRoute {
     });
 
     this.router.post("/register-web3", cors(), (req, res) => {
+      // res.setHeader("Access-Control-Allow-Origin", "*")
       this.registerWeb3(req, res);
     });
 
@@ -96,7 +97,7 @@ export class AuthController implements AppRoute {
 
   private async registerWeb3(req: Request, res: Response) {
     const { password, type, chainAddress } = req.body;
-
+    
     if (!password || !type || !chainAddress) {
       res.status(400).json({ msg: "Fields can't be empty!" });
       return;

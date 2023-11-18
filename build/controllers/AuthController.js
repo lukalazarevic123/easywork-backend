@@ -31,6 +31,7 @@ class AuthController {
             this.register(req, res);
         });
         this.router.post("/register-web3", (0, cors_1.default)(), (req, res) => {
+            // res.setHeader("Access-Control-Allow-Origin", "*")
             this.registerWeb3(req, res);
         });
         this.router.post("/login-web3", (0, cors_1.default)(), (req, res) => {
