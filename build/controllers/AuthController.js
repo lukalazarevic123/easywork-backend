@@ -37,6 +37,9 @@ class AuthController {
         this.router.post("/login-web3", (0, cors_1.default)(), (req, res) => {
             this.loginWeb3(req, res);
         });
+        this.router.get("/clients", (0, cors_1.default)(), (req, res) => {
+            this.getAllClients(req, res);
+        });
     }
     // classic web2 login without chain address
     login(req, res) {
@@ -140,6 +143,23 @@ class AuthController {
                 return res.status(200).json({ token });
             }
             return res.status(404).json({ msg: "Not found" });
+        });
+    }
+    getAllClients(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const clients = yield UserModel_1.UserModel.find({
+                    type: "CLIENT"
+                }, {
+                    password: 0,
+                    email: 0,
+                    type: 0
+                });
+                return res.status(200).json(clients);
+            }
+            catch (e) {
+                return res.status(500).json({ msg: "Something went wrong" });
+            }
         });
     }
 }

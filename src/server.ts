@@ -50,6 +50,7 @@ export class Server {
     public run() {
         const port = process.env.PORT || 4000;
         const server = http.createServer(this.app);
+        
         server.listen(port, () => {
             console.log(`Express server running on port ${port}.`);
         });

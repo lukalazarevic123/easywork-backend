@@ -29,6 +29,10 @@ export class AuthController implements AppRoute {
     this.router.post("/login-web3", cors(), (req, res) => {
       this.loginWeb3(req, res);
     })
+
+    this.router.get("/clients", cors(), (req, res) => {
+      this.getAllClients(req, res);
+    })
   }
 
   // classic web2 login without chain address
@@ -154,5 +158,21 @@ export class AuthController implements AppRoute {
     }
 
     return res.status(404).json({ msg: "Not found" });
+  }
+
+  private async getAllClients(req: Request, res: Response) {
+    try {
+      const clients = await UserModel.find({
+        type: "CLIENT"
+      }, {
+        password: 0,
+        email: 0,
+        type: 0
+      });
+
+      return res.status(200).json(clients);
+    } catch (e) {
+      return res.status(500).json({msg: "Something went wrong"});
+    }
   }
 }
