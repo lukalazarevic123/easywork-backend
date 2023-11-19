@@ -40,8 +40,11 @@ class JobController {
         this.router.get("/id/:id", (0, cors_1.default)(), (req, res) => {
             this.getJobById(req, res);
         });
+        this.router.post("/apply/:id", (0, cors_1.default)(), (req, res) => {
+            this.applyToJob(req, res);
+        });
     }
-    estimateGas(functionName, data) {
+    estimateGas(functionName, data, value) {
         return __awaiter(this, void 0, void 0, function* () {
             const provider = new ethers_1.ethers.AlchemyProvider("sepolia", process.env.ALCHEMY_API_KEY);
             console.log(data);
@@ -52,6 +55,7 @@ class JobController {
                 data: new ethers_1.ethers.Interface(EASyWork_1.EASyWork).encodeFunctionData(functionName, [
                     ...data,
                 ]),
+                value
             });
             const numberValue = ethers_1.ethers.toNumber(estimatedGas) * 3;
             return {
@@ -72,14 +76,6 @@ class JobController {
                 !description) {
                 return res.status(400).json({ msg: "Bad request" });
             }
-            // const schemaEncoder = new SchemaEncoder("string field1, string field2, uint256 field3, uint256 field4, string field5");
-            // const encodedData = schemaEncoder.encodeData([
-            //   { name: "field1", value: title, type: "string" },
-            //   { name: "field2", value: category, type: "string" },
-            //   { name: "field3", value: deadline, type: "uint256" },
-            //   { name: "field4", value: parseEther(price.toString()), type: "uint256" },
-            //   { name: "field5", value: description, type: "string" },
-            // ]);
             const firstArray = ["string", "string", "uint256", "uint256", "string"];
             const secondArray = [
                 title,
@@ -90,7 +86,7 @@ class JobController {
             ];
             const encodedData = ethers_1.AbiCoder.defaultAbiCoder().encode(firstArray, secondArray);
             const attestationRequestData = {
-                recipient: beneficiary,
+                recipient: process.env.RELAY_ADDRESS,
                 expirationTime: 0,
                 revocable: false,
                 refUID: "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -101,8 +97,6 @@ class JobController {
                 schema: process.env.CREATE_SCHEMA,
                 data: attestationRequestData,
             };
-            console.log(attestationRequest);
-            // Assuming you have already created an instance of the Relayer
             const relayer = new defender_relay_client_1.Relayer({
                 apiKey: (_a = process.env.API_KEY) !== null && _a !== void 0 ? _a : "",
                 apiSecret: (_b = process.env.API_SECRET) !== null && _b !== void 0 ? _b : "",
@@ -110,7 +104,7 @@ class JobController {
             try {
                 const estimatedGasCreateGig = yield this.estimateGas("createGig", [
                     attestationRequest,
-                ]);
+                ], 0);
                 // console.log("GAS", estimatedGasCreateGig);
                 // Assuming easyWorkInstance is the instance of your EASYWork contract
                 const txCreateGig = yield relayer.sendTransaction({
@@ -172,7 +166,7 @@ class JobController {
             const endpoint = "https://sepolia.easscan.org/graphql";
             const query = `
   query {
-    attestations(where: { schemaId: { equals: "0xf602cc558d4aa60987b4b51d3416f55cc59cb66f6571682681116775c04b4251" } }) {
+    attestations(where: { schemaId: { equals: "${process.env.CREATE_SCHEMA}" } }) {
       id 
       attester
       recipient
@@ -249,6 +243,83 @@ class JobController {
                 price: (0, ethers_1.formatEther)(dec[3]),
                 description: dec[4],
             });
+        });
+    }
+    applyToJob(req, res) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const { freelancer } = req.body;
+            const query = `query Attestation {
+      attestation(
+        where: { id: "${req.params.id}" }
+      ) {
+        id
+        attester
+        recipient
+        refUID
+        revocable
+        revocationTime
+        expirationTime
+        data
+      }
+    }`;
+            const endpoint = "https://sepolia.easscan.org/graphql";
+            const job = yield fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ query }),
+            });
+            const jobJson = yield job.json();
+            const firstArray = ["string", "string", "uint256", "uint256", "string"];
+            const dec = ethers_1.AbiCoder.defaultAbiCoder().decode(firstArray, jobJson.data.attestation.data);
+            const params = ["address", "string"];
+            const encodedData = ethers_1.AbiCoder.defaultAbiCoder().encode(params, [
+                freelancer,
+                `Freelancer ${freelancer} assigned to gig ${req.params.id}`,
+            ]);
+            const attestationRequestData = {
+                recipient: process.env.RELAY_ADDRESS,
+                expirationTime: 0,
+                revocable: false,
+                refUID: jobJson.data.attestation.id,
+                data: encodedData,
+                value: 0, // assuming price is the correct field
+            };
+            const attestationRequest = {
+                schema: process.env.APPLY_SCHEMA,
+                data: attestationRequestData,
+            };
+            console.log(attestationRequest);
+            const relayer = new defender_relay_client_1.Relayer({
+                apiKey: (_a = process.env.API_KEY) !== null && _a !== void 0 ? _a : "",
+                apiSecret: (_b = process.env.API_SECRET) !== null && _b !== void 0 ? _b : "",
+            });
+            try {
+                const estimatedGasCreateGig = yield this.estimateGas("assignGig", [
+                    attestationRequest.data.refUID, attestationRequest
+                ], (dec[3].toString()));
+                console.log("DEC[3]", dec[3].toString());
+                // console.log("GAS", estimatedGasCreateGig);
+                // Assuming easyWorkInstance is the instance of your EASYWork contract
+                const txCreateGig = yield relayer.sendTransaction({
+                    to: process.env.CONTRACT_ADDRESS,
+                    data: new ethers_1.ethers.Interface(EASyWork_1.EASyWork).encodeFunctionData("assignGig", [
+                        attestationRequest.data.refUID, attestationRequest,
+                    ]),
+                    maxFeePerGas: estimatedGasCreateGig.maxFeePerGas.toString(),
+                    maxPriorityFeePerGas: estimatedGasCreateGig.maxFeePerGas.toString(),
+                    gasLimit: estimatedGasCreateGig.gasLimit.toString(),
+                    value: dec[3].toString()
+                });
+                // Handle success response
+                return res.status(200).json({ txCreateGig });
+            }
+            catch (error) {
+                console.error(error);
+                return res.status(500).json({ error: "Internal server error" });
+            }
         });
     }
 }

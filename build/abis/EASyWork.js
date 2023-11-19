@@ -35,6 +35,16 @@ exports.EASyWork = [
     },
     {
         inputs: [],
+        name: "EASYWork__CanNotCancelActiveGig",
+        type: "error",
+    },
+    {
+        inputs: [],
+        name: "EASYWork__CanNotFinishNonActiveGig",
+        type: "error",
+    },
+    {
+        inputs: [],
         name: "EASYWork__GigAlreadyAssigned",
         type: "error",
     },
@@ -195,6 +205,19 @@ exports.EASyWork = [
     {
         inputs: [
             {
+                internalType: "bytes32",
+                name: "uid",
+                type: "bytes32",
+            },
+        ],
+        name: "cancelGig",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+    },
+    {
+        inputs: [
+            {
                 components: [
                     {
                         internalType: "bytes32",
@@ -273,45 +296,6 @@ exports.EASyWork = [
         type: "function",
     },
     {
-        inputs: [
-            {
-                internalType: "bytes",
-                name: "data",
-                type: "bytes",
-            },
-        ],
-        name: "decodeDescriptionGigAttestationData",
-        outputs: [
-            {
-                internalType: "string",
-                name: "jobTitle",
-                type: "string",
-            },
-            {
-                internalType: "string",
-                name: "category",
-                type: "string",
-            },
-            {
-                internalType: "uint256",
-                name: "deadline",
-                type: "uint256",
-            },
-            {
-                internalType: "uint256",
-                name: "price",
-                type: "uint256",
-            },
-            {
-                internalType: "string",
-                name: "description",
-                type: "string",
-            },
-        ],
-        stateMutability: "pure",
-        type: "function",
-    },
-    {
         inputs: [],
         name: "descriptionGigSchemaId",
         outputs: [
@@ -341,19 +325,62 @@ exports.EASyWork = [
         inputs: [
             {
                 internalType: "bytes32",
-                name: "",
+                name: "uid",
                 type: "bytes32",
             },
-        ],
-        name: "gigAssigned",
-        outputs: [
             {
-                internalType: "bool",
-                name: "",
-                type: "bool",
+                components: [
+                    {
+                        internalType: "bytes32",
+                        name: "schema",
+                        type: "bytes32",
+                    },
+                    {
+                        components: [
+                            {
+                                internalType: "address",
+                                name: "recipient",
+                                type: "address",
+                            },
+                            {
+                                internalType: "uint64",
+                                name: "expirationTime",
+                                type: "uint64",
+                            },
+                            {
+                                internalType: "bool",
+                                name: "revocable",
+                                type: "bool",
+                            },
+                            {
+                                internalType: "bytes32",
+                                name: "refUID",
+                                type: "bytes32",
+                            },
+                            {
+                                internalType: "bytes",
+                                name: "data",
+                                type: "bytes",
+                            },
+                            {
+                                internalType: "uint256",
+                                name: "value",
+                                type: "uint256",
+                            },
+                        ],
+                        internalType: "struct AttestationRequestData",
+                        name: "data",
+                        type: "tuple",
+                    },
+                ],
+                internalType: "struct AttestationRequest",
+                name: "request",
+                type: "tuple",
             },
         ],
-        stateMutability: "view",
+        name: "finishGig",
+        outputs: [],
+        stateMutability: "nonpayable",
         type: "function",
     },
     {
@@ -364,6 +391,25 @@ exports.EASyWork = [
                 internalType: "bytes32",
                 name: "",
                 type: "bytes32",
+            },
+        ],
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        inputs: [
+            {
+                internalType: "bytes32",
+                name: "",
+                type: "bytes32",
+            },
+        ],
+        name: "gigStatus",
+        outputs: [
+            {
+                internalType: "enum EASYWork.Status",
+                name: "",
+                type: "uint8",
             },
         ],
         stateMutability: "view",
