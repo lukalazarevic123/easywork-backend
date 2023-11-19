@@ -43,6 +43,9 @@ class JobController {
         this.router.post("/apply/:id", (0, cors_1.default)(), (req, res) => {
             this.applyToJob(req, res);
         });
+        this.router.get("/freelancer/:id", (0, cors_1.default)(), (req, res) => {
+            this.getFreelancer(req, res);
+        });
     }
     estimateGas(functionName, data, value) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -55,7 +58,7 @@ class JobController {
                 data: new ethers_1.ethers.Interface(EASyWork_1.EASyWork).encodeFunctionData(functionName, [
                     ...data,
                 ]),
-                value
+                value,
             });
             const numberValue = ethers_1.ethers.toNumber(estimatedGas) * 3;
             return {
@@ -102,9 +105,7 @@ class JobController {
                 apiSecret: (_b = process.env.API_SECRET) !== null && _b !== void 0 ? _b : "",
             });
             try {
-                const estimatedGasCreateGig = yield this.estimateGas("createGig", [
-                    attestationRequest,
-                ], 0);
+                const estimatedGasCreateGig = yield this.estimateGas("createGig", [attestationRequest], 0);
                 // console.log("GAS", estimatedGasCreateGig);
                 // Assuming easyWorkInstance is the instance of your EASYWork contract
                 const txCreateGig = yield relayer.sendTransaction({
@@ -297,21 +298,20 @@ class JobController {
                 apiSecret: (_b = process.env.API_SECRET) !== null && _b !== void 0 ? _b : "",
             });
             try {
-                const estimatedGasCreateGig = yield this.estimateGas("assignGig", [
-                    attestationRequest.data.refUID, attestationRequest
-                ], (dec[3].toString()));
+                const estimatedGasCreateGig = yield this.estimateGas("assignGig", [attestationRequest.data.refUID, attestationRequest], dec[3].toString());
                 console.log("DEC[3]", dec[3].toString());
                 // console.log("GAS", estimatedGasCreateGig);
                 // Assuming easyWorkInstance is the instance of your EASYWork contract
                 const txCreateGig = yield relayer.sendTransaction({
                     to: process.env.CONTRACT_ADDRESS,
                     data: new ethers_1.ethers.Interface(EASyWork_1.EASyWork).encodeFunctionData("assignGig", [
-                        attestationRequest.data.refUID, attestationRequest,
+                        attestationRequest.data.refUID,
+                        attestationRequest,
                     ]),
                     maxFeePerGas: estimatedGasCreateGig.maxFeePerGas.toString(),
                     maxPriorityFeePerGas: estimatedGasCreateGig.maxFeePerGas.toString(),
                     gasLimit: estimatedGasCreateGig.gasLimit.toString(),
-                    value: dec[3].toString()
+                    value: dec[3].toString(),
                 });
                 // Handle success response
                 return res.status(200).json({ txCreateGig });
@@ -320,6 +320,50 @@ class JobController {
                 console.error(error);
                 return res.status(500).json({ error: "Internal server error" });
             }
+        });
+    }
+    getFreelancer(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { id } = req.params;
+            const endpoint = "https://sepolia.easscan.org/graphql";
+            const query = `
+  query {
+    attestations(where: { schemaId: { equals: "${process.env.APPLY_SCHEMA}" } }) {
+      id 
+      attester
+      recipient
+      refUID
+      revocable
+      revocationTime
+      expirationTime
+      data
+      schema {
+        id
+      }
+    }
+  }
+`;
+            const jobs = yield fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ query }),
+            });
+            const jobsData = yield jobs.json();
+            const firstArray = ["address", "string"];
+            const gigs = jobsData.data.attestations;
+            console.log(gigs);
+            for (let i = 0; i < gigs.length; i++) {
+                if (gigs[i].refUID === id) {
+                    const dec = ethers_1.AbiCoder.defaultAbiCoder().decode(firstArray, gigs[i].data);
+                    return res.status(200).json({
+                        id: gigs[i].id,
+                        description: dec[1],
+                    });
+                }
+            }
+            return res.status(404).json({ msg: "Not found" });
         });
     }
 }

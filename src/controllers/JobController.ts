@@ -45,6 +45,10 @@ export class JobController implements AppRoute {
     this.router.post("/apply/:id", cors(), (req, res) => {
       this.applyToJob(req, res);
     });
+
+    this.router.get("/freelancer/:id", cors(), (req, res) => {
+      this.getFreelancer(req, res);
+    });
   }
   private async estimateGas(functionName: string, data: any, value: number) {
     const provider = new ethers.AlchemyProvider(
@@ -60,7 +64,7 @@ export class JobController implements AppRoute {
       data: new ethers.Interface(EASyWork).encodeFunctionData(functionName, [
         ...data,
       ]),
-      value
+      value,
     });
 
     const numberValue = ethers.toNumber(estimatedGas) * 3;
@@ -121,9 +125,11 @@ export class JobController implements AppRoute {
     });
 
     try {
-      const estimatedGasCreateGig = await this.estimateGas("createGig", [
-        attestationRequest,
-      ], 0);
+      const estimatedGasCreateGig = await this.estimateGas(
+        "createGig",
+        [attestationRequest],
+        0
+      );
 
       // console.log("GAS", estimatedGasCreateGig);
 
@@ -326,8 +332,6 @@ export class JobController implements AppRoute {
       `Freelancer ${freelancer} assigned to gig ${req.params.id}`,
     ]);
 
-    
-
     const attestationRequestData = {
       recipient: process.env.RELAY_ADDRESS,
       expirationTime: 0, // assuming deadline is the correct field
@@ -348,9 +352,11 @@ export class JobController implements AppRoute {
     });
 
     try {
-      const estimatedGasCreateGig = await this.estimateGas("assignGig", [
-        attestationRequest.data.refUID, attestationRequest
-      ], (dec[3].toString()));
+      const estimatedGasCreateGig = await this.estimateGas(
+        "assignGig",
+        [attestationRequest.data.refUID, attestationRequest],
+        dec[3].toString()
+      );
       console.log("DEC[3]", dec[3].toString());
       // console.log("GAS", estimatedGasCreateGig);
 
@@ -359,12 +365,13 @@ export class JobController implements AppRoute {
       const txCreateGig = await relayer.sendTransaction({
         to: process.env.CONTRACT_ADDRESS, // Replace with the actual address of your deployed EASYWork contract
         data: new ethers.Interface(EASyWork).encodeFunctionData("assignGig", [
-          attestationRequest.data.refUID, attestationRequest,
+          attestationRequest.data.refUID,
+          attestationRequest,
         ]),
         maxFeePerGas: estimatedGasCreateGig.maxFeePerGas.toString(),
         maxPriorityFeePerGas: estimatedGasCreateGig.maxFeePerGas.toString(),
         gasLimit: estimatedGasCreateGig.gasLimit.toString(),
-        value: dec[3].toString()
+        value: dec[3].toString(),
       });
 
       // Handle success response
@@ -373,5 +380,55 @@ export class JobController implements AppRoute {
       console.error(error);
       return res.status(500).json({ error: "Internal server error" });
     }
+  }
+
+  private async getFreelancer(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const endpoint = "https://sepolia.easscan.org/graphql";
+
+    const query = `
+  query {
+    attestations(where: { schemaId: { equals: "${process.env.APPLY_SCHEMA}" } }) {
+      id 
+      attester
+      recipient
+      refUID
+      revocable
+      revocationTime
+      expirationTime
+      data
+      schema {
+        id
+      }
+    }
+  }
+`;
+
+    const jobs = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    const jobsData = await jobs.json();
+
+    const firstArray = ["address", "string"];
+    const gigs = jobsData.data.attestations;
+
+    console.log(gigs);
+    for (let i = 0; i < gigs.length; i++) {
+      if (gigs[i].refUID === id) {
+        const dec = AbiCoder.defaultAbiCoder().decode(firstArray, gigs[i].data);
+        return res.status(200).json({
+          id: gigs[i].id,
+          description: dec[1],
+        });
+      }
+    }
+
+    return res.status(404).json({msg: "Not found"});
   }
 }
