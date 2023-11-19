@@ -46,6 +46,12 @@ class JobController {
         this.router.get("/freelancer/:id", (0, cors_1.default)(), (req, res) => {
             this.getFreelancer(req, res);
         });
+        this.router.get("/status/:id", (0, cors_1.default)(), (req, res) => {
+            this.getStatus(req, res);
+        });
+        this.router.post("/finish/:id", (0, cors_1.default)(), (req, res) => {
+            this.finishGig(req, res);
+        });
     }
     estimateGas(functionName, data, value) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -364,6 +370,80 @@ class JobController {
                 }
             }
             return res.status(404).json({ msg: "Not found" });
+        });
+    }
+    getStatus(req, res) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ msg: "Bad request" });
+            }
+            // Assuming you have already created an instance of the Relayer
+            const relayer = new defender_relay_client_1.Relayer({
+                apiKey: (_a = process.env.API_KEY) !== null && _a !== void 0 ? _a : "",
+                apiSecret: (_b = process.env.API_SECRET) !== null && _b !== void 0 ? _b : "",
+            });
+            try {
+                const estimatedGas = yield this.estimateGas("gigStatus", [id], 0);
+                const provider = new ethers_1.ethers.AlchemyProvider("sepolia", process.env.ALCHEMY_API_KEY);
+                const contractInstance = new ethers_1.ethers.Contract(process.env.CONTRACT_ADDRESS, EASyWork_1.EASyWork, provider);
+                const status = yield contractInstance.gigStatus(id);
+                console.log(status);
+                // Handle success response
+                return res.status(200).json({ status: status.toString() });
+            }
+            catch (error) {
+                console.error(error);
+                return res.status(500).json({ error: "Internal server error" });
+            }
+        });
+    }
+    finishGig(req, res) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const { id } = req.params;
+            const { refUID } = req.body;
+            try {
+                const relayer = new defender_relay_client_1.Relayer({
+                    apiKey: (_a = process.env.API_KEY) !== null && _a !== void 0 ? _a : "",
+                    apiSecret: (_b = process.env.API_SECRET) !== null && _b !== void 0 ? _b : "",
+                });
+                const firstArray = ["string"];
+                const secondArray = [
+                    "This attestation was earned for a good job!"
+                ];
+                const encodedData = ethers_1.AbiCoder.defaultAbiCoder().encode(firstArray, secondArray);
+                console.log(refUID);
+                const attestationRequestData = {
+                    recipient: process.env.RELAY_ADDRESS,
+                    expirationTime: 0,
+                    revocable: false,
+                    refUID,
+                    data: encodedData,
+                    value: 0,
+                };
+                const attestationRequest = {
+                    schema: process.env.FINISH_SCHEMA,
+                    data: attestationRequestData,
+                };
+                const estimatedGas = yield this.estimateGas("finishGig", [id, attestationRequest], 0);
+                const txFinishGig = yield relayer.sendTransaction({
+                    to: process.env.CONTRACT_ADDRESS,
+                    data: new ethers_1.ethers.Interface(EASyWork_1.EASyWork).encodeFunctionData("finishGig", [
+                        id, attestationRequest
+                    ]),
+                    maxFeePerGas: estimatedGas.maxFeePerGas.toString(),
+                    maxPriorityFeePerGas: estimatedGas.maxFeePerGas.toString(),
+                    gasLimit: estimatedGas.gasLimit.toString(),
+                });
+                // Handle success response
+                return res.status(200).json(txFinishGig);
+            }
+            catch (error) {
+                console.error(error);
+                throw new Error("Failed to finish gig on-chain");
+            }
         });
     }
 }

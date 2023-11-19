@@ -49,7 +49,16 @@ export class JobController implements AppRoute {
     this.router.get("/freelancer/:id", cors(), (req, res) => {
       this.getFreelancer(req, res);
     });
+
+    this.router.get("/status/:id", cors(), (req, res) => {
+      this.getStatus(req, res);
+    });
+
+    this.router.post("/finish/:id", cors(), (req, res) => {
+      this.finishGig(req, res);
+    });
   }
+
   private async estimateGas(functionName: string, data: any, value: number) {
     const provider = new ethers.AlchemyProvider(
       "sepolia",
@@ -429,6 +438,98 @@ export class JobController implements AppRoute {
       }
     }
 
-    return res.status(404).json({msg: "Not found"});
+    return res.status(404).json({ msg: "Not found" });
+  }
+
+  private async getStatus(req: Request, res: Response) {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ msg: "Bad request" });
+    }
+
+    // Assuming you have already created an instance of the Relayer
+    const relayer = new Relayer({
+      apiKey: process.env.API_KEY ?? "",
+      apiSecret: process.env.API_SECRET ?? "",
+    });
+
+    try {
+      const estimatedGas = await this.estimateGas("gigStatus", [id], 0);
+      const provider = new ethers.AlchemyProvider(
+        "sepolia",
+        process.env.ALCHEMY_API_KEY
+      );
+
+      const contractInstance = new ethers.Contract(
+        process.env.CONTRACT_ADDRESS,
+        EASyWork,
+        provider
+      );
+
+      const status = await contractInstance.gigStatus(id);
+      console.log(status);
+      // Handle success response
+      return res.status(200).json({ status: status.toString() });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  private async finishGig(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const { refUID } = req.body
+
+    try {
+      const relayer = new Relayer({
+        apiKey: process.env.API_KEY ?? "",
+        apiSecret: process.env.API_SECRET ?? "",
+      });
+
+      const firstArray = ["string"];
+      const secondArray = [
+        "This attestation was earned for a good job!"
+      ];
+
+      const encodedData = AbiCoder.defaultAbiCoder().encode(
+        firstArray,
+        secondArray
+      );
+
+        console.log(refUID)
+      const attestationRequestData = {
+        recipient: process.env.RELAY_ADDRESS,
+        expirationTime: 0, 
+        revocable: false, 
+        refUID, 
+        data: encodedData, 
+        value: 0, 
+      };
+
+      const attestationRequest = {
+        schema: process.env.FINISH_SCHEMA,
+        data: attestationRequestData,
+      };
+
+      const estimatedGas = await this.estimateGas("finishGig", [id, attestationRequest], 0);
+
+      const txFinishGig = await relayer.sendTransaction({
+        to: process.env.CONTRACT_ADDRESS,
+        data: new ethers.Interface(EASyWork).encodeFunctionData("finishGig", [
+          id, attestationRequest
+        ]),
+        maxFeePerGas: estimatedGas.maxFeePerGas.toString(),
+        maxPriorityFeePerGas: estimatedGas.maxFeePerGas.toString(),
+        gasLimit: estimatedGas.gasLimit.toString(),
+      });
+
+      // Handle success response
+      return res.status(200).json(txFinishGig);
+    } catch (error) {
+      console.error(error);
+      throw new Error("Failed to finish gig on-chain");
+    }
   }
 }
